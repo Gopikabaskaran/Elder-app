@@ -1,5 +1,5 @@
 // api/generate-plan.js
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -19,11 +19,11 @@ export default async function handler(req, res) {
     const { userProfile } = req.body;
 
     // API key stored securely on server
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-    const prompt = `
-You are an expert geriatric health and wellness advisor. Generate a comprehensive, personalized health plan for an elderly patient.
+    const prompt = `You are an expert geriatric health and wellness advisor. Generate a comprehensive, personalized health plan for an elderly patient.
 
 **Patient Information:**
 - Name: ${userProfile.name}
@@ -82,12 +82,18 @@ Provide comprehensive recommendations in this exact JSON format:
   }
 }
 
-Generate at least 3-4 fitness exercises, 4 meal recommendations, 3 safety categories, and complete schedules.
-`;
+Generate at least 3-4 fitness exercises, 4 meal recommendations, 3 safety categories, and complete schedules.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant that generates health plans in JSON format.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+    });
+
+    const text = completion.choices[0].message.content;
 
     let jsonText = text;
     if (text.includes('```json')) {
@@ -102,10 +108,10 @@ Generate at least 3-4 fitness exercises, 4 meal recommendations, 3 safety catego
 
   } catch (error) {
     console.error('Error:', error);
-    return res.status(500).json({ 
-      success: false, 
+    return res.status(500).json({
+      success: false,
       error: 'Failed to generate recommendations',
-      details: error.message 
+      details: error.message
     });
   }
 }
